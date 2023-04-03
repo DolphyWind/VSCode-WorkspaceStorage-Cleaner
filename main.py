@@ -2,6 +2,8 @@ import os
 import sys
 import getpass
 import json
+import shutil
+
 try:
     import colorama
     from colorama import Fore, Back, Style
@@ -18,11 +20,13 @@ try:
         
         print(foreground_color + background_color + message + Style.RESET_ALL, end=end)
 except ImportError:
-    def printWithColor(message: str, end: str='\n'):
+    def printWithColor(message: str, fore: str, back: str, end: str='\n'):
         """Implement printWithColor function for systems that doesn't have colorama installed. Does not print with colors.
 
         Args:
             message (str): The thing you want to print.
+            fore (str): Does nothing.
+            back (str): Does nothing.
             end (str, optional): end parameter of the print. Defaults to '\n'.
         """
 
@@ -179,8 +183,23 @@ def parseWSSFolder(path: str) -> list[Folder]:
             pass
     
     return result_list
-        
+
+def getUnusedFolderSize(folders: list[Folder]) -> int:
+    """Calculates unused folders' size
+
+    Args:
+        folders (list[Folder]): List of folders
+
+    Returns:
+        int: size in bytes
+    """
     
+    total_size = 0
+    for folder in folders:
+        total_size += folder.sizeinbytes if not folder.workspace_exists else 0
+    
+    return total_size
+
 def main():
     printWithColor("Looking for workspaceFolder path...", Fore.BLUE)
     wss_path = getDefaultWSSFolderPath()
@@ -193,12 +212,39 @@ def main():
         printWithColor("Script couldn't find workspaceStorage folder.", Fore.RED)
         askForValidWSSPath()
     else:
-        printWithColor(f"Found workspaceStorage folder in {wss_path}!", Fore.GREEN)
+        printWithColor(f"Found workspaceStorage folder in {wss_path}", Fore.GREEN)
         if askYesNoQuestion("Do you want to provide an alternative path?"):
             askForValidWSSPath()
         
     folders = parseWSSFolder(wss_path)
+    filtered_folders = list(filter(lambda x: not x.workspace_exists, folders))
+    unused_size = getUnusedFolderSize(folders)
+    unused_size_formatted = format_size(unused_size)
+    total_size = getSizeOfFolder(wss_path)
+    percentage = round(100 * unused_size/total_size, 2)
     
+    if unused_size == 0:
+        print("No unused workspaceStorage folder found!", Fore.GREEN)
+        return
+    printWithColor("Found ", end='')
+    printWithColor(unused_size_formatted, Fore.CYAN, end='')
+    printWithColor(" of unused workspaceStorage folder(s). ", end='')
+    printWithColor(f'{percentage}%', Fore.CYAN, end='')
+    printWithColor(" of total.")
+    
+    if askYesNoQuestion("Do you want to clear ALL of them?"):
+        printWithColor("Clearing ", end='')
+        printWithColor(str(len(filtered_folders)), Fore.CYAN, end='')
+        printWithColor(" folder(s).")
+        try:
+            for folder in filtered_folders:
+                shutil.rmtree(folder.path)
+        except Exception as e:
+            printWithColor(f"Catched an exception while removing folders: {e}. Aborting...")
+        else:
+            printWithColor("Succesfully cleared all unused folders!", Fore.GREEN)
+    else:
+        printWithColor("Aborted...", Fore.RED)
         
 if __name__ == '__main__':
     main()
