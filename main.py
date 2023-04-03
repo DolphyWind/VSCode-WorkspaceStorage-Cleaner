@@ -209,11 +209,13 @@ def main():
     unused_size = getUnusedFolderSize(folders)
     unused_size_formatted = format_size(unused_size)
     total_size = getSizeOfFolder(wss_path)
-    percentage = round(100 * unused_size/total_size, 2)
     
-    if unused_size == 0:
+    if unused_size == 0 or total_size == 0:
         print("No unused workspaceStorage folder found!", Fore.GREEN)
         return
+    
+    percentage = round(100 * unused_size/total_size, 2)
+    
     printWithColor("Found ", end='')
     printWithColor(unused_size_formatted, Fore.CYAN, end='')
     printWithColor(" of unused workspaceStorage folder(s). ", end='')
