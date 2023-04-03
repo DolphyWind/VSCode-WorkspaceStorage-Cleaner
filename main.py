@@ -2,6 +2,33 @@ import os
 import sys
 import getpass
 
+has_colorama = False
+try:
+    import colorama
+    from colorama import Fore, Back, Style
+    colorama.init()
+    def printWithColor(message: str, foreground_color: Fore=Fore.RESET, background_color: Back=Back.BLACK, end: str='\n'):
+        """Prints colored text if colorama is installed
+
+        Args:
+            message (str): The thing you want to print
+            foreground_color (Fore): Foreground color of the text. Defaults to Fore.RESET.
+            background_color (Back): Background coor of the text. Defaults to Back.BLACK.
+            end (str, optional): end paramater of the print. Defaults to '\n'.
+        """
+        
+        print(foreground_color + background_color + message + Style.RESET_ALL, end=end)
+except ImportError:
+    def printWithColor(message: str, end: str='\n'):
+        """Implement printWithColor function for systems that doesn't have colorama installed. Does not print with colors.
+
+        Args:
+            message (str): The thing you want to print.
+            end (str, optional): end parameter of the print. Defaults to '\n'.
+        """
+
+        print(message, end=end)
+
 def getDefaultWSSFolderPath() -> str:
     """Returns default workspaceStorage path based on operating system that the script ran on
 
@@ -61,7 +88,13 @@ def askYesNoQuestion(questionBody: str, yes_patterns: list[str]=['y', 'yes'], no
         bool: Returns true if lowered input is in yes_patterns, false if lowered input is in no_patterns
     """
     while True:
-        inp = input(questionBody)
+        print(questionBody, end='')
+        printWithColor(' (', Fore.MAGENTA, end='')
+        printWithColor('y', Fore.GREEN, end='')
+        printWithColor('/', Fore.MAGENTA, end='')
+        printWithColor('n', Fore.RED, end='')
+        printWithColor(')', Fore.MAGENTA, end='')
+        inp = input(': ')
         if inp.lower() in yes_patterns:
             return True
         elif inp.lower() in no_patterns:
@@ -70,19 +103,19 @@ def askYesNoQuestion(questionBody: str, yes_patterns: list[str]=['y', 'yes'], no
         print("Please give a valid answer!")
     
 def main():
-    print("Looking for workspaceFolder path.")
+    printWithColor("Looking for workspaceFolder path...", Fore.BLUE)
     wss_path = getDefaultWSSFolderPath()
     
     if not wss_path:
-        print("This OS is not supported.")
+        printWithColor("This OS is not supported.", Fore.RED)
         return
     
     if not isValidWSSPath(wss_path):
-        print("Script couldn't find workspaceStorage folder.")
+        printWithColor("Script couldn't find workspaceStorage folder.", Fore.RED)
         askForValidWSSPath()
     else:
-        print(f"Found workspaceStorageFolder in {wss_path}.")
-        if askYesNoQuestion("Do you want to provide an alternative path? (y/n): "):
+        printWithColor(f"Found workspaceStorage folder in {wss_path}!", Fore.GREEN)
+        if askYesNoQuestion("Do you want to provide an alternative path?"):
             askForValidWSSPath()
         
         
