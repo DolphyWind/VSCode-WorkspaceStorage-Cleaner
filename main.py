@@ -3,34 +3,21 @@ import sys
 import getpass
 import json
 import shutil
+import colorama
+from colorama import Fore, Back, Style
+colorama.init()
 
-try:
-    import colorama
-    from colorama import Fore, Back, Style
-    colorama.init()
-    def printWithColor(message: str, foreground_color: Fore=Fore.RESET, background_color: Back=Back.BLACK, end: str='\n'):
-        """Prints colored text if colorama is installed
+def printWithColor(message: str, foreground_color: Fore=Fore.RESET, background_color: Back=Back.BLACK, end: str='\n'):
+    """Prints colored text if colorama is installed
 
-        Args:
-            message (str): The thing you want to print
-            foreground_color (Fore): Foreground color of the text. Defaults to Fore.RESET.
-            background_color (Back): Background coor of the text. Defaults to Back.BLACK.
-            end (str, optional): end paramater of the print. Defaults to '\n'.
-        """
-        
-        print(foreground_color + background_color + message + Style.RESET_ALL, end=end)
-except ImportError:
-    def printWithColor(message: str, fore: str, back: str, end: str='\n'):
-        """Implement printWithColor function for systems that doesn't have colorama installed. Does not print with colors.
-
-        Args:
-            message (str): The thing you want to print.
-            fore (str): Does nothing.
-            back (str): Does nothing.
-            end (str, optional): end parameter of the print. Defaults to '\n'.
-        """
-
-        print(message, end=end)
+    Args:
+        message (str): The thing you want to print
+        foreground_color (Fore): Foreground color of the text. Defaults to Fore.RESET.
+        background_color (Back): Background coor of the text. Defaults to Back.BLACK.
+        end (str, optional): end paramater of the print. Defaults to '\n'.
+    """
+    
+    print(foreground_color + background_color + message + Style.RESET_ALL, end=end)
 
 class Folder:
     def __init__(self, path: str, workspace_exists: bool, sizeinbytes: int) -> None:
