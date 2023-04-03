@@ -51,13 +51,14 @@ def format_size(size_bytes: int) -> str:
         str: Human readable size in str format
     """
     if size_bytes < 1024:
-        return f"{size_bytes} bytes"
+        return f"{size_bytes} B"
     elif size_bytes < 1024 ** 2:
         return f"{size_bytes / 1024:.2f} KB"
     elif size_bytes < 1024 ** 3:
         return f"{size_bytes / (1024 ** 2):.2f} MB"
-    else:
+    elif size_bytes < 1024 ** 4:
         return f"{size_bytes / (1024 ** 3):.2f} GB"
+    return f"{size_bytes / (1024 ** 4):.2f} TB"
 
 def getDefaultWSSFolderPath() -> str:
     """Returns default workspaceStorage path based on operating system that the script ran on
