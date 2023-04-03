@@ -1,8 +1,7 @@
 import os
 import sys
 import getpass
-
-has_colorama = False
+import json
 try:
     import colorama
     from colorama import Fore, Back, Style
@@ -29,6 +28,33 @@ except ImportError:
 
         print(message, end=end)
 
+class Folder:
+    def __init__(self, path: str, workspace_exists: bool, sizeinbytes: int) -> None:
+        self.path: str = path
+        self.workspace_exists: bool = workspace_exists
+        self.sizeinbytes: int = sizeinbytes
+    
+    def __repr__(self) -> str:
+        return f'(path: {self.path}, workspace_exists: {self.workspace_exists}, sizeinbytes: {self.sizeinbytes})'
+
+def format_size(size_bytes: int) -> str:
+    """Converts size as bytes to human readable format
+
+    Args:
+        size_bytes (int): Size to convert
+
+    Returns:
+        str: Human readable size in str format
+    """
+    if size_bytes < 1024:
+        return f"{size_bytes} bytes"
+    elif size_bytes < 1024 ** 2:
+        return f"{size_bytes / 1024:.2f} KB"
+    elif size_bytes < 1024 ** 3:
+        return f"{size_bytes / (1024 ** 2):.2f} MB"
+    else:
+        return f"{size_bytes / (1024 ** 3):.2f} GB"
+
 def getDefaultWSSFolderPath() -> str:
     """Returns default workspaceStorage path based on operating system that the script ran on
 
@@ -42,7 +68,7 @@ def getDefaultWSSFolderPath() -> str:
     elif sys.platform == 'darwin':
         return f'/home/{username}/Library/Application Support/Code/User/workspaceStorage/'
     elif sys.platform in ('win32', 'win64'):
-        return f'C:\\Users\\{username}\\AppData\\Roaming\\Code\\User\\workspaceStorage\\'
+        return f'C:/Users/{username}/AppData/Roaming/Code/User/workspaceStorage/'
 
     return ''
 
@@ -101,6 +127,59 @@ def askYesNoQuestion(questionBody: str, yes_patterns: list[str]=['y', 'yes'], no
             return False
         
         print("Please give a valid answer!")
+
+def getSizeOfFolder(path: str) -> int:
+    """Calculates a foldersize recursively
+
+    Args:
+        path (str): Path to calculate size of
+
+    Returns:
+        int: Total size in bytes
+    """
+
+    total_size = 0
+    for f in os.listdir(path):
+        full_path = os.path.join(path, f)
+        if os.path.isfile(full_path):
+            total_size += os.path.getsize(full_path)
+        elif os.path.isdir(full_path):
+            total_size += getSizeOfFolder(full_path)
+    return total_size
+
+def parseWSSFolder(path: str) -> list[Folder]:
+    """Parses workspaceStorage folder
+
+    Args:
+        path (str): workspaceStorage path
+
+    Returns:
+        list[Folder]: List of folders
+    """
+    
+    result_list: list[Folder] = []
+    for folder in os.listdir(path):
+        full_path = os.path.join(path, folder)
+        json_text = ''
+        
+        with open(os.path.join(full_path, "workspace.json"), 'r') as file:
+            json_text = file.read()
+        data = json.loads(json_text)
+        
+        try:
+            target_folder_name: str = data['folder']
+            target_folder_name = target_folder_name.removeprefix('file://')
+            
+            result_list.append(Folder(
+                full_path,
+                os.path.exists(target_folder_name),
+                getSizeOfFolder(full_path),
+            ))
+        except KeyError:
+            pass
+    
+    return result_list
+        
     
 def main():
     printWithColor("Looking for workspaceFolder path...", Fore.BLUE)
@@ -118,7 +197,8 @@ def main():
         if askYesNoQuestion("Do you want to provide an alternative path?"):
             askForValidWSSPath()
         
-        
+    folders = parseWSSFolder(wss_path)
+    
         
 if __name__ == '__main__':
     main()
