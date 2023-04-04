@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import sys
+from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import colorama
@@ -168,41 +169,39 @@ def getSizeOfFolder(path: str) -> int:
 
 def parseWSSFolder(path: str) -> list[Folder]:
     """Parses workspaceStorage folder
-
     Args:
         path (str): workspaceStorage path
-
     Returns:
         list[Folder]: List of folders
     """
 
     result_list: list[Folder] = []
-    for folder in os.listdir(path):
-        full_path = os.path.join(path, folder)
+    for folder_name in os.listdir(path):
+        folder_path = Path(path) / folder_name
         json_text = ""
 
-        with open(os.path.join(full_path, "workspace.json"), "r") as file:
+        with (folder_path / "workspace.json").open("r") as file:
             json_text = file.read()
+
         data = json.loads(json_text)
 
-        if "folder" not in data.keys():
+        if "folder" not in data:
             continue
 
-        target_folder_name: str = data["folder"]
-        target_folder_name = unquote(urlparse(target_folder_name).path)
+        target_folder_name = Path(unquote(urlparse(data["folder"]).path))
 
         # Consider a folder "old" if it isn't modified in the last 30 days
-        lastmodified = dt.datetime.fromtimestamp(os.path.getmtime(full_path))
+        last_modified = dt.datetime.fromtimestamp(os.path.getmtime(folder_path))
         now = dt.datetime.now()
-        delta = now - lastmodified
+        delta = now - last_modified
         is_old = delta.days > 30
 
         result_list.append(
             Folder(
-                full_path,
-                os.path.exists(target_folder_name),
+                str(folder_path),
+                target_folder_name.is_dir(),
                 is_old,
-                getSizeOfFolder(full_path),
+                getSizeOfFolder(str(folder_path)),
             )
         )
 
