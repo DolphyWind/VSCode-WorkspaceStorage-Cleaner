@@ -53,15 +53,13 @@ def format_size(size_bytes: int) -> str:
     Returns:
         str: Human readable size in str format
     """
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024**2:
-        return f"{size_bytes / 1024:.2f} KB"
-    elif size_bytes < 1024**3:
-        return f"{size_bytes / (1024 ** 2):.2f} MB"
-    elif size_bytes < 1024**4:
-        return f"{size_bytes / (1024 ** 3):.2f} GB"
-    return f"{size_bytes / (1024 ** 4):.2f} TB"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = size_bytes
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    return f"{size:.2f} {units[unit_index]}"
 
 
 def getDefaultWSSFolderPath() -> str:
@@ -73,13 +71,17 @@ def getDefaultWSSFolderPath() -> str:
     username = getpass.getuser()
 
     if sys.platform in ("linux", "linux2"):
-        return f"/home/{username}/.config/Code/User/workspaceStorage/"
+        return str(Path(f"/home/{username}/.config/Code/User/workspaceStorage/"))
     elif sys.platform == "darwin":
-        return (
-            f"/home/{username}/Library/Application Support/Code/User/workspaceStorage/"
+        return str(
+            Path(
+                f"/Users/{username}/Library/Application Support/Code/User/workspaceStorage/"
+            )
         )
     elif sys.platform in ("win32", "win64"):
-        return f"C:/Users/{username}/AppData/Roaming/Code/User/workspaceStorage/"
+        return str(
+            Path(f"C:/Users/{username}/AppData/Roaming/Code/User/workspaceStorage/")
+        )
 
     return ""
 
@@ -97,11 +99,10 @@ def isValidWSSPath(path: str) -> bool:
         return False
 
     folders = os.listdir(path)
-    for folder in folders:
-        full_path = os.path.join(path, folder)
-        if not os.path.exists(os.path.join(full_path, "workspace.json")):
-            return False
-    return True
+    return all(
+        os.path.exists(os.path.join(path, folder, "workspace.json"))
+        for folder in folders
+    )
 
 
 def askForValidWSSPath() -> str:
