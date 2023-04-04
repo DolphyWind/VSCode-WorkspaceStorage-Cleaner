@@ -211,7 +211,7 @@ def main():
     total_size = getSizeOfFolder(wss_path)
     
     if unused_size == 0 or total_size == 0:
-        print("No unused workspaceStorage folder found!", Fore.GREEN)
+        printWithColor("No unused workspaceStorage folder found!", Fore.GREEN)
         return
     
     percentage = round(100 * unused_size/total_size, 2)
