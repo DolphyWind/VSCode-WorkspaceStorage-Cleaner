@@ -241,20 +241,29 @@ def main():
 
     percentage = round(100 * unwanted_size / total_size, 2)
 
+    printWithColor("Found ", end="")
+    printWithColor(str(len(unwanted_folders)), Fore.CYAN, end="")
     printWithColor(
-        f"Found {len(unwanted_folders)} folder{'s' if len(unwanted_folders) > 1 else ''} with total size of {unwanted_size_formatted}. ({percentage}% of total)"
+        f" folder{'s' if len(unwanted_folders) > 1 else ''} with total size of ", end=""
     )
+    printWithColor(unwanted_size_formatted, Fore.CYAN, end="")
+    printWithColor(f". ({Fore.CYAN}{percentage}%{Fore.RESET} of total)")
 
-    if askYesNoQuestion("Do you want to clear ALL unwanted folders?"):
+    if askYesNoQuestion(
+        f"Do you want to clear {Fore.CYAN}ALL{Fore.RESET} unwanted folders?"
+    ):
         try:
-            printWithColor(
-                f"Removing {len(unwanted_folders)} folder{'s' if len(unwanted_folders) > 1 else ''}."
-            )
-            for i, folder in enumerate(unwanted_folders, start=1):
+            for (i, folder) in enumerate(unwanted_folders):
                 print(
-                    f"\rRemoving {os.path.basename(os.path.normpath(folder.path))} ({i}/{len(unwanted_folders)})",
+                    f"\rRemoving {os.path.basename(os.path.normpath(folder.path))} ",
                     end="",
                 )
+                printWithColor("(", Fore.MAGENTA, end="")
+                printWithColor(str(i + 1), Fore.CYAN, end="")
+                printWithColor("/", Fore.MAGENTA, end="")
+                printWithColor(str(len(unwanted_folders)), Fore.CYAN, end="")
+                printWithColor(")", Fore.MAGENTA, end="")
+                print(" " * 10, end="")
                 shutil.rmtree(folder.path)
             print()
             printWithColor("Successfully cleared all unused folders!", Fore.GREEN)
