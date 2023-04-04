@@ -6,7 +6,9 @@ import shutil
 import colorama
 from colorama import Fore, Back, Style
 from urllib.parse import unquote, urlparse
+import datetime as dt
 colorama.init()
+
 
 def printWithColor(message: str, foreground_color: Fore=Fore.RESET, background_color: Back=Back.BLACK, end: str='\n'):
     """Prints colored text if colorama is installed
@@ -20,14 +22,17 @@ def printWithColor(message: str, foreground_color: Fore=Fore.RESET, background_c
     
     print(foreground_color + background_color + message + Style.RESET_ALL, end=end)
 
+
 class Folder:
-    def __init__(self, path: str, workspace_exists: bool, sizeinbytes: int) -> None:
+    def __init__(self, path: str, workspace_exists: bool, is_old: bool, sizeinbytes: int) -> None:
         self.path: str = path
         self.workspace_exists: bool = workspace_exists
+        self.is_old = is_old
         self.sizeinbytes: int = sizeinbytes
-    
+
     def __repr__(self) -> str:
         return f'(path: {self.path}, workspace_exists: {self.workspace_exists}, sizeinbytes: {self.sizeinbytes})'
+
 
 def format_size(size_bytes: int) -> str:
     """Converts size as bytes to human readable format
@@ -119,7 +124,7 @@ def askYesNoQuestion(questionBody: str, yes_patterns: list[str]=['y', 'yes'], no
         elif inp.lower() in no_patterns:
             return False
         
-        print("Please give a valid answer!")
+        printWithColor("Please provide a valid answer...", Fore.RED)
 
 def getSizeOfFolder(path: str) -> int:
     """Calculates a foldersize recursively
@@ -159,35 +164,26 @@ def parseWSSFolder(path: str) -> list[Folder]:
             json_text = file.read()
         data = json.loads(json_text)
         
-        try:
-            target_folder_name: str = data['folder']
-            target_folder_name = unquote(urlparse(target_folder_name).path)
-            
-            result_list.append(Folder(
-                full_path,
-                os.path.exists(target_folder_name),
-                getSizeOfFolder(full_path),
-            ))
-        except KeyError:
-            pass
+        if 'folder' not in data.keys():
+            continue
+        
+        target_folder_name: str = data['folder']
+        target_folder_name = unquote(urlparse(target_folder_name).path)
+        
+        # Consider a folder "old" if it isn't modified in the last 30 days
+        lastmodified = dt.datetime.fromtimestamp(os.path.getmtime(full_path))
+        now = dt.datetime.now()
+        delta = now - lastmodified
+        is_old = delta.days > 30
+        
+        result_list.append(Folder(
+            full_path,
+            os.path.exists(target_folder_name),
+            is_old,
+            getSizeOfFolder(full_path),
+        ))
     
     return result_list
-
-def getUnusedFolderSize(folders: list[Folder]) -> int:
-    """Calculates unused folders' size
-
-    Args:
-        folders (list[Folder]): List of folders
-
-    Returns:
-        int: size in bytes
-    """
-    
-    total_size = 0
-    for folder in folders:
-        total_size += folder.sizeinbytes if not folder.workspace_exists else 0
-    
-    return total_size
 
 def main():
     printWithColor("Looking for workspaceFolder path...", Fore.BLUE)
@@ -198,7 +194,7 @@ def main():
         return
     
     if not isValidWSSPath(wss_path):
-        printWithColor("Script couldn't find workspaceStorage folder.", Fore.RED)
+        printWithColor("Script couldn't find workspaceStorage folder.", Fore.YELLOW)
         askForValidWSSPath()
     else:
         printWithColor(f"Found workspaceStorage folder in {wss_path}", Fore.GREEN)
@@ -206,37 +202,56 @@ def main():
             askForValidWSSPath()
         
     folders = parseWSSFolder(wss_path)
-    filtered_folders = list(filter(lambda x: not x.workspace_exists, folders))
-    unused_size = getUnusedFolderSize(folders)
-    unused_size_formatted = format_size(unused_size)
+    # Mark old and/or unused workspaces as unwanted
+    unwanted_folders = [x for x in folders if x.is_old or not x.workspace_exists]
+    unwanted_size = sum([x.sizeinbytes for x in unwanted_folders])
+    unwanted_size_formatted = format_size(unwanted_size)
     total_size = getSizeOfFolder(wss_path)
+    total_size_formatted = format_size(total_size)
     
-    if unused_size == 0 or total_size == 0:
-        printWithColor("No unused workspaceStorage folder found!", Fore.GREEN)
+    if len(unwanted_folders) == 0:
+        printWithColor("No unwanted workspaceStorage folder found!", Fore.GREEN)
         return
     
-    percentage = round(100 * unused_size/total_size, 2)
+    percentage = round(100 * unwanted_size/total_size, 2)
     
     printWithColor("Found ", end='')
-    printWithColor(unused_size_formatted, Fore.CYAN, end='')
-    printWithColor(" of unused workspaceStorage folder(s). ", end='')
-    printWithColor(f'{percentage}%', Fore.CYAN, end='')
-    printWithColor(" of total.")
+    printWithColor(str(len(unwanted_folders)), Fore.CYAN, end='')
+    printWithColor(f" folder{'s' if len(unwanted_folders) > 1 else ''} with total size of ", end='')
+    printWithColor(unwanted_size_formatted, Fore.CYAN, end='')
+    printWithColor(f". ({Fore.CYAN}{percentage}%{Fore.RESET} of total)")
     
-    if askYesNoQuestion("Do you want to clear ALL of them?"):
-        printWithColor("Clearing ", end='')
-        printWithColor(str(len(filtered_folders)), Fore.CYAN, end='')
-        printWithColor(" folder(s).")
+    if askYesNoQuestion(f"Do you want to clear {Fore.CYAN}ALL{Fore.RESET} unwanted folders?"):
+        printWithColor("Removing ", end='')
+        printWithColor(str(len(unwanted_folders)), Fore.CYAN, end='')
+        printWithColor(f" folder{'s' if len(unwanted_folders) > 1 else ''}.")
         try:
-            for folder in filtered_folders:
+            for (i, folder) in enumerate(unwanted_folders):
+                print(f'\rRemoving {os.path.basename(os.path.normpath(folder.path))} ', end='')
+                printWithColor('(', Fore.MAGENTA, end='')
+                printWithColor(str(i+1), Fore.CYAN, end='')
+                printWithColor('/', Fore.MAGENTA, end='')
+                printWithColor(str(len(unwanted_folders)), Fore.CYAN, end='')
+                printWithColor(')', Fore.MAGENTA, end='')
+                print(' ' * 10, end='')
+                
                 shutil.rmtree(folder.path)
+            print()
+        except KeyboardInterrupt:
+            printWithColor("Got KeyboardInterrupt. Aborting...", Fore.RED)
         except Exception as e:
             printWithColor(f"Catched an exception while removing folders: {e}. Aborting...")
         else:
             printWithColor("Succesfully cleared all unused folders!", Fore.GREEN)
     else:
-        printWithColor("Aborted...", Fore.RED)
-        
+        printWithColor("Aborting...", Fore.RED)
+
+    
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        printWithColor("\nGot KeyboardInterrupt. Aborting...", Fore.RED)
+    except Exception as e:
+        printWithColor(f"\nGot an exception while executing script: {e}", Fore.YELLOW)
 
