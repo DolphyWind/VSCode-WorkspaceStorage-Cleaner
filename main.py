@@ -5,6 +5,7 @@ import json
 import shutil
 import colorama
 from colorama import Fore, Back, Style
+from urllib.parse import unquote, urlparse
 colorama.init()
 
 def printWithColor(message: str, foreground_color: Fore=Fore.RESET, background_color: Back=Back.BLACK, end: str='\n'):
@@ -160,7 +161,7 @@ def parseWSSFolder(path: str) -> list[Folder]:
         
         try:
             target_folder_name: str = data['folder']
-            target_folder_name = target_folder_name.removeprefix('file://')
+            target_folder_name = unquote(urlparse(target_folder_name).path)
             
             result_list.append(Folder(
                 full_path,
