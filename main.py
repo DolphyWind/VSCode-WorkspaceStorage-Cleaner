@@ -117,9 +117,7 @@ def askForValidWSSPath() -> str:
 
 
 def askYesNoQuestion(
-    questionBody: str,
-    yes_patterns: list[str] = ["y", "yes"],
-    no_patterns: list[str] = ["n", "no"],
+    questionBody: str, yes_patterns: list[str] = None, no_patterns: list[str] = None
 ) -> bool:
     """Asks user a yes/no question.
 
@@ -131,6 +129,10 @@ def askYesNoQuestion(
     Returns:
         bool: Returns true if lowered input is in yes_patterns, false if lowered input is in no_patterns
     """
+    if yes_patterns is None:
+        yes_patterns = ["y", "yes"]
+    if no_patterns is None:
+        no_patterns = ["n", "no"]
     while True:
         print(questionBody, end="")
         printWithColor(" (", Fore.MAGENTA, end="")
@@ -227,54 +229,42 @@ def main():
     folders = parseWSSFolder(wss_path)
     # Mark old and/or unused workspaces as unwanted
     unwanted_folders = [x for x in folders if x.is_old or not x.workspace_exists]
-    unwanted_size = sum([x.sizeinbytes for x in unwanted_folders])
+    unwanted_size = sum(x.sizeinbytes for x in unwanted_folders)
     unwanted_size_formatted = format_size(unwanted_size)
     total_size = getSizeOfFolder(wss_path)
     total_size_formatted = format_size(total_size)
 
-    if len(unwanted_folders) == 0:
+    if not unwanted_folders:
         printWithColor("No unwanted workspaceStorage folder found!", Fore.GREEN)
         return
 
     percentage = round(100 * unwanted_size / total_size, 2)
 
-    printWithColor("Found ", end="")
-    printWithColor(str(len(unwanted_folders)), Fore.CYAN, end="")
     printWithColor(
-        f" folder{'s' if len(unwanted_folders) > 1 else ''} with total size of ", end=""
+        f"Found {len(unwanted_folders)} folder{'s' if len(unwanted_folders) > 1 else ''} with total size of {unwanted_size_formatted}. ({percentage}% of total)"
     )
-    printWithColor(unwanted_size_formatted, Fore.CYAN, end="")
-    printWithColor(f". ({Fore.CYAN}{percentage}%{Fore.RESET} of total)")
 
-    if askYesNoQuestion(
-        f"Do you want to clear {Fore.CYAN}ALL{Fore.RESET} unwanted folders?"
-    ):
-        printWithColor("Removing ", end="")
-        printWithColor(str(len(unwanted_folders)), Fore.CYAN, end="")
-        printWithColor(f" folder{'s' if len(unwanted_folders) > 1 else ''}.")
+    if askYesNoQuestion("Do you want to clear ALL unwanted folders?"):
         try:
-            for (i, folder) in enumerate(unwanted_folders):
+            printWithColor(
+                f"Removing {len(unwanted_folders)} folder{'s' if len(unwanted_folders) > 1 else ''}."
+            )
+            for i, folder in enumerate(unwanted_folders, start=1):
                 print(
-                    f"\rRemoving {os.path.basename(os.path.normpath(folder.path))} ",
+                    f"\rRemoving {os.path.basename(os.path.normpath(folder.path))} ({i}/{len(unwanted_folders)})",
                     end="",
                 )
-                printWithColor("(", Fore.MAGENTA, end="")
-                printWithColor(str(i + 1), Fore.CYAN, end="")
-                printWithColor("/", Fore.MAGENTA, end="")
-                printWithColor(str(len(unwanted_folders)), Fore.CYAN, end="")
-                printWithColor(")", Fore.MAGENTA, end="")
-                print(" " * 10, end="")
-
                 shutil.rmtree(folder.path)
             print()
+            printWithColor("Successfully cleared all unused folders!", Fore.GREEN)
         except KeyboardInterrupt:
             printWithColor("Got KeyboardInterrupt. Aborting...", Fore.RED)
         except Exception as e:
             printWithColor(
-                f"Catched an exception while removing folders: {e}. Aborting..."
+                f"Caught an exception while removing folders: {e}. Aborting..."
             )
-        else:
-            printWithColor("Succesfully cleared all unused folders!", Fore.GREEN)
+        finally:
+            return
     else:
         printWithColor("Aborting...", Fore.RED)
 
