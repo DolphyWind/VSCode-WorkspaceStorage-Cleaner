@@ -255,15 +255,14 @@ def main():
         try:
             for (i, folder) in enumerate(unwanted_folders):
                 print(
-                    f"\rRemoving {os.path.basename(os.path.normpath(folder.path))} ",
+                    f"\rRemoving \"{os.path.basename(os.path.normpath(folder.path))}\" ",
                     end="",
                 )
                 printWithColor("(", Fore.MAGENTA, end="")
                 printWithColor(str(i + 1), Fore.CYAN, end="")
                 printWithColor("/", Fore.MAGENTA, end="")
                 printWithColor(str(len(unwanted_folders)), Fore.CYAN, end="")
-                printWithColor(")", Fore.MAGENTA, end="")
-                print(" " * 10, end="")
+                printWithColor(")", Fore.MAGENTA, end=" ")
                 shutil.rmtree(folder.path)
             print()
             printWithColor("Successfully cleared all unused folders!", Fore.GREEN)
