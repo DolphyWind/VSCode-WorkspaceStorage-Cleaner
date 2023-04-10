@@ -6,6 +6,7 @@ import shutil
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+import readline
 
 import colorama
 from colorama import Back, Fore, Style
