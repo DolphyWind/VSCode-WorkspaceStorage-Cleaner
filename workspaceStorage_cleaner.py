@@ -1,12 +1,12 @@
 import datetime as dt
 import getpass
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 import readline
+from dataclasses import dataclass
 
 import colorama
 from colorama import Back, Fore, Style
@@ -31,19 +31,12 @@ def printWithColor(
 
     print(foreground_color + background_color + message + Style.RESET_ALL, end=end)
 
-
+@dataclass
 class Folder:
-    def __init__(
-        self, path: str, workspace_exists: bool, is_old: bool, sizeinbytes: int
-    ) -> None:
-        self.path: str = path
-        self.workspace_exists: bool = workspace_exists
-        self.is_old = is_old
-        self.sizeinbytes: int = sizeinbytes
-
-    def __repr__(self) -> str:
-        return f"(path: {self.path}, workspace_exists: {self.workspace_exists}, sizeinbytes: {self.sizeinbytes})"
-
+    path: str
+    workspace_exists: bool
+    is_old: bool
+    sizeinbytes: int
 
 def format_size(size_bytes: int) -> str:
     """Converts size as bytes to human readable format
@@ -96,12 +89,12 @@ def isValidWSSPath(path: str) -> bool:
     Returns:
         bool: True if given folder path is a valid workspaceStorage folder
     """
-    if not os.path.exists(path):
+    if not Path(path).exists() or not Path(path).is_dir():
         return False
 
-    folders = os.listdir(path)
+    folders = [content for content in Path(path).iterdir()]
     return all(
-        os.path.exists(os.path.join(path, folder, "workspace.json"))
+        Path( Path(path) / folder / "workspace.json" ).exists()
         for folder in folders
     )
 
@@ -119,7 +112,7 @@ def askForValidWSSPath() -> str:
 
 
 def askYesNoQuestion(
-    questionBody: str, yes_patterns: list[str] = None, no_patterns: list[str] = None
+    questionBody: str, yes_patterns: list[str] = None, no_patterns: list[str] = None, return_for_none: bool = False
 ) -> bool:
     """Asks user a yes/no question.
 
@@ -138,15 +131,18 @@ def askYesNoQuestion(
     while True:
         print(questionBody, end="")
         printWithColor(" (", Fore.MAGENTA, end="")
-        printWithColor("y", Fore.GREEN, end="")
+        printWithColor("Y" if return_for_none else "y", Fore.GREEN, end="")
         printWithColor("/", Fore.MAGENTA, end="")
-        printWithColor("n", Fore.RED, end="")
+        printWithColor("N" if not return_for_none else "n", Fore.RED, end="")
         printWithColor(")", Fore.MAGENTA, end="")
         inp = input(": ")
         if inp.lower() in yes_patterns:
             return True
         elif inp.lower() in no_patterns:
             return False
+
+        if not inp:
+            return return_for_none
 
         printWithColor("Please provide a valid answer...", Fore.RED)
 
@@ -162,11 +158,10 @@ def getSizeOfFolder(path: str) -> int:
     """
 
     total_size = 0
-    for f in os.listdir(path):
-        full_path = os.path.join(path, f)
-        if os.path.isfile(full_path):
-            total_size += os.path.getsize(full_path)
-        elif os.path.isdir(full_path):
+    for full_path in Path(path).iterdir():
+        if Path(full_path).is_file():
+            total_size += Path(full_path).stat().st_size
+        elif Path(full_path).is_dir():
             total_size += getSizeOfFolder(full_path)
     return total_size
 
@@ -180,8 +175,7 @@ def parseWSSFolder(path: str) -> list[Folder]:
     """
 
     result_list: list[Folder] = []
-    for folder_name in os.listdir(path):
-        folder_path = Path(path) / folder_name
+    for folder_path in Path(path).iterdir():
         json_text = ""
 
         with (folder_path / "workspace.json").open("r") as file:
@@ -195,24 +189,27 @@ def parseWSSFolder(path: str) -> list[Folder]:
         target_folder_name = Path(unquote(urlparse(data["folder"]).path))
 
         # Consider a folder "old" if it isn't modified in the last 30 days
-        last_modified = dt.datetime.fromtimestamp(os.path.getmtime(folder_path))
+        last_modified = dt.datetime.fromtimestamp(Path(folder_path).stat().st_mtime)
         now = dt.datetime.now()
         delta = now - last_modified
         is_old = delta.days > 30
 
         result_list.append(
             Folder(
-                str(folder_path),
-                target_folder_name.is_dir(),
-                is_old,
-                getSizeOfFolder(str(folder_path)),
+                path=str(folder_path),
+                workspace_exists=target_folder_name.is_dir(),
+                is_old=is_old,
+                sizeinbytes=getSizeOfFolder(str(folder_path)),
             )
         )
 
     return result_list
 
-
 def main():
+    # Enable filesystem autocompletion
+    readline.set_completer_delims('\t\n')
+    readline.parse_and_bind('tab: complete')
+    
     printWithColor("Looking for workspaceFolder path...", Fore.BLUE)
     wss_path = getDefaultWSSFolderPath()
 
@@ -256,7 +253,7 @@ def main():
         try:
             for (i, folder) in enumerate(unwanted_folders):
                 print(
-                    f"\rRemoving \"{os.path.basename(os.path.normpath(folder.path))}\" ",
+                    f"\rRemoving \"{Path(folder.path).name}\" ",
                     end="",
                 )
                 printWithColor("(", Fore.MAGENTA, end="")
